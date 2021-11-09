@@ -278,8 +278,34 @@ return function (App $app) {
             ->withHeader('Access-Control-Allow-Origin', '*');
     });
 
-    // $app->group('/users', function (Group $group) {
-    //     $group->get('', ListUsersAction::class);
-    //     $group->get('/{id}', ViewUserAction::class);
-    // });
+    $app->group('/CMS', function (Group $group) {
+        $group->get('/login/{ user }/{ pwd }', function (Request $request, Response $response, array $args) {
+            $DB = new MySql();
+            $user = $args['user'];
+            $pwd = $args['pwd'];
+            $sql = "SELECT * FROM `usuarios` WHERE `correo` = ? AND `password` = ? AND rol = 1;";
+            $res = $DB->Buscar_Seguro( $sql, array( $user, $pwd ) );
+            if ( count( $res ) == 0 ) {
+                $info = json_encode(
+                    array(
+                        'success' => false,
+                        'code' => 400,
+                        'data' => $res
+                    )
+                );
+            } else {
+                $info = json_encode(
+                    array(
+                        'success' => true,
+                        'code' => 200,
+                        'data' => $res
+                    )
+                );
+            }
+            $response->getBody()->write( $info );
+            return $response
+                ->withHeader('Content-Type', 'application/json')
+                ->withHeader('Access-Control-Allow-Origin', '*');
+        });
+    });
 };
