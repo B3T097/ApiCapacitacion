@@ -345,6 +345,34 @@ return function (App $app) {
                 ->withHeader('Access-Control-Allow-Origin', '*');
         });
 
+        $group->get('/user/{ id }', function (Request $request, Response $response, array $args) {
+            $id = $args['id'];
+            $DB = new MySql();
+            $sql = "SELECT * FROM usuarios WHERE id = ?";
+            $res = $DB->Buscar_Seguro( $sql, array( $id ) );
+            if ( count( $res ) == 0 ) {
+                $info = json_encode(
+                    array(
+                        'success' => false,
+                        'code' => 400,
+                        'data' => $res
+                    )
+                );
+            } else {
+                $info = json_encode(
+                    array(
+                        'success' => true,
+                        'code' => 200,
+                        'data' => $res
+                    )
+                );
+            }
+            $response->getBody()->write( $info );
+            return $response
+                ->withHeader('Content-Type', 'application/json')
+                ->withHeader('Access-Control-Allow-Origin', '*');
+        });
+
         $group->post('/EditUser', function (Request $request, Response $response, array $args) {
 
             $data = $request->getParsedBody();
