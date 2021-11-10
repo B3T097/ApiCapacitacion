@@ -142,7 +142,7 @@ return function (App $app) {
 
     $app->get('/preguntas/{ encuesta }', function (Request $request, Response $response, array $args) {
         $DB = new MySql();
-        $encuesta = intval( $args['encuesta'] );
+        $encuesta = ( $args['encuesta'] );
         if ($encuesta == 0) {
             $info = json_encode(
                 array(
@@ -151,8 +151,7 @@ return function (App $app) {
                     'data' => $encuesta
                 )
             );
-        } 
-        else {
+        } else {
             $sql = "SELECT p.pregunta, r.id AS idRespuesta, r.id_pregunta, r.respuesta 
                     FROM preguntas AS p 
                     INNER JOIN respuestas AS r ON r.id_pregunta = p.id 
@@ -170,13 +169,21 @@ return function (App $app) {
             } else {
                 $preguntas = [];
                 $aux=[];
+                $inicio = 0;
+                $final = 0;
+                $auxInicio = false;
                 foreach ($res as $key => $value) {
+                    if ( !$auxInicio ) {
+                        $inicio = $value['id_pregunta'];
+                        $auxInicio = true;
+                    }
+                    $final = $value['id_pregunta'];
                     $preguntas[$value['id_pregunta']][] = $value;
                 }
 
                 $letras = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'];
 
-                for ($i=1; $i < count( $preguntas ) + 1; $i++) {
+                for ($i=$inicio; $i < $final + 1; $i++) {
                     $auxRespuestas = array();
                     for ($e=0; $e < count( $preguntas[$i] ); $e++) {
                         $auxRespuestas[]  = array(
@@ -302,6 +309,77 @@ return function (App $app) {
                     )
                 );
             }
+            $response->getBody()->write( $info );
+            return $response
+                ->withHeader('Content-Type', 'application/json')
+                ->withHeader('Access-Control-Allow-Origin', '*');
+        });
+
+        $group->get('/users', function (Request $request, Response $response, array $args) {
+            $DB = new MySql();
+            $sql = "SELECT u.id, u.nombre, 
+            ( SELECT COUNT(id) FROM usuarios_encuestas WHERE `status` = 1 AND `id_usuario` = u.id ) AS contestadas, 
+            ( SELECT COUNT(id) FROM usuarios_encuestas WHERE `status` = 0 AND `id_usuario` = u.id ) AS faltantes 
+            FROM usuarios AS u WHERE rol = 2;";
+            $res = $DB->Buscar( $sql );
+            if ( count( $res ) == 0 ) {
+                $info = json_encode(
+                    array(
+                        'success' => false,
+                        'code' => 400,
+                        'data' => $res
+                    )
+                );
+            } else {
+                $info = json_encode(
+                    array(
+                        'success' => true,
+                        'code' => 200,
+                        'data' => $res
+                    )
+                );
+            }
+            $response->getBody()->write( $info );
+            return $response
+                ->withHeader('Content-Type', 'application/json')
+                ->withHeader('Access-Control-Allow-Origin', '*');
+        });
+
+        $group->post('/EditUser', function (Request $request, Response $response, array $args) {
+
+            $data = $request->getParsedBody();
+
+            $DB = new MySql();
+            if ($data['id'] == 0 || $data['id'] == '0') {
+                $sql = "INSERT INTO `usuarios`(`nombre`, `correo`, `password`, `area`, `puesto`, `rol`) 
+                VALUES (?, ?, ?, ?, ?, ?);";
+                $params = array( $data['nombre'], $data['correo'], $data['pwd'], $data['area'], $data['puesto'], $data['rol'] );
+            } else {
+                $sql = "UPDATE `usuarios` SET `nombre`=?,`correo`=?,`password`=?,`area`=?,`puesto`=?,`rol`=? WHERE `id`=?;";
+                $params = array( $data['nombre'], $data['correo'], $data['pwd'], $data['area'], $data['puesto'], $data['rol'], $data['id'] );
+            }
+
+            $res = $DB->Ejecutar_Seguro( $sql, $params );
+            if ( $res == 200 || $res == '200' ) {
+                $info = json_encode(
+                    array(
+                        'success' => true,
+                        'code' => 200,
+                        'data' => $res,
+                        'message' => 'Los datos se guardaron exitosamente'
+                    )
+                );
+            } else {
+                $info = json_encode(
+                    array(
+                        'success' => false,
+                        'code' => 400,
+                        'data' => $res,
+                        'message' => 'Ocurrio un error al guardar la información.'
+                    )
+                );
+            }
+
             $response->getBody()->write( $info );
             return $response
                 ->withHeader('Content-Type', 'application/json')
