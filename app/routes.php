@@ -413,5 +413,116 @@ return function (App $app) {
                 ->withHeader('Content-Type', 'application/json')
                 ->withHeader('Access-Control-Allow-Origin', '*');
         });
+
+        $group->get('/encuestas', function (Request $request, Response $response, array $args) {
+            $DB = new MySql();
+            $sql = "SELECT * FROM encuestas";
+            $res = $DB->Buscar( $sql );
+            if ( count( $res ) == 0 ) {
+                $info = json_encode(
+                    array(
+                        'success' => false,
+                        'code' => 400,
+                        'data' => $res
+                    )
+                );
+            } else {
+                $info = json_encode(
+                    array(
+                        'success' => true,
+                        'code' => 200,
+                        'data' => $res
+                    )
+                );
+            }
+            $response->getBody()->write( $info );
+            return $response
+                ->withHeader('Content-Type', 'application/json')
+                ->withHeader('Access-Control-Allow-Origin', '*');
+        });
+
+        $group->get('/encuesta/{ id }', function (Request $request, Response $response, array $args) {
+            $id = $args['id'];
+            $DB = new MySql();
+            $sql = "SELECT e.*, l.leccion, l.video FROM encuestas AS e INNER JOIN lecciones AS l ON l.id_encuesta = e.id WHERE e.id = ?;";
+            $res = $DB->Buscar_Seguro( $sql, array( $id ) );
+            $sqlUsers = "SELECT * FROM usuarios_encuestas WHERE id_encuesta = ?;";
+            $resUsers = $DB->Buscar_Seguro( $sqlUsers, array( $id ) );
+            if ( count( $res ) == 0 ) {
+                $info = json_encode(
+                    array(
+                        'success' => false,
+                        'code' => 400,
+                        'data' => $res
+                    )
+                );
+            } else {
+                $info = json_encode(
+                    array(
+                        'success' => true,
+                        'code' => 200,
+                        'data' => array(
+                            'encuesta' => $res,
+                            'usuarios' => $resUsers
+                        )
+                    )
+                );
+            }
+            $response->getBody()->write( $info );
+            return $response
+                ->withHeader('Content-Type', 'application/json')
+                ->withHeader('Access-Control-Allow-Origin', '*');
+        });
+
+        $group->post('/EditEncuesta', function (Request $request, Response $response, array $args) {
+
+            $data = $request->getParsedBody();
+
+            $DB = new MySql();
+            if ($data['id'] == 0 || $data['id'] == '0') {
+                $sqlEncuesta = "INSERT INTO `encuestas`(`nombre`, `descripcion`) VALUES ( ?, ? )";
+                $params = array( $data['nombre'], $data['descripcion'] );
+                $res = $DB->Ejecutar_Seguro( $sqlEncuesta, $params );
+                $idEncuesta = $DB->Buscar('SELECT MAX(id) AS id FROM encuestas LIMIT 1;')[0]['id'];
+                $Leccion = $DB->Ejecutar_Seguro("INSERT INTO `lecciones`(`id_encuesta`, `leccion`, `video`) VALUES ( ?, ?, ? )", array( $idEncuesta, $data['leccion'], $data['video'] ));
+                $arrayUsuarios = explode( ',', $data['usuarios'] );
+                foreach ($arrayUsuarios as $usuario) {
+                    $addUsuarioEncuesta = $DB->Ejecutar_Seguro("INSERT INTO `usuarios_encuestas`( `id_usuario`, `id_encuesta`) VALUES ( ?, ? )", array( $usuario, $idEncuesta ));
+                }
+            } else {
+                $Encuesta = $DB->Ejecutar_Seguro( "UPDATE `encuestas` SET `nombre`= ?,`descripcion`= ? WHERE `id`= ?", array( $data['nombre'], $data['descripcion'], $data['id'] ) );
+                $leccion = $DB->Ejecutar_Seguro( "UPDATE `lecciones` SET `leccion`= ?,`video`= ? WHERE `id_encuesta`= ?", array( $data['leccion'], $data['video'], $data['id'] ) );
+                $deleteUsuarios = $DB->Ejecutar("DELETE FROM `usuarios_encuestas` WHERE id_encuesta = " . $data['id']);
+                $arrayUsuarios = explode( ',', $data['usuarios'] );
+                foreach ($arrayUsuarios as $usuario) {
+                    $addUsuarioEncuesta = $DB->Ejecutar_Seguro("INSERT INTO `usuarios_encuestas`( `id_usuario`, `id_encuesta`) VALUES ( ?, ? )", array( $usuario, $data['id'] ));
+                }
+            }
+
+            if ( $Leccion == 200 || $Leccion == '200' ) {
+                $info = json_encode(
+                    array(
+                        'success' => true,
+                        'code' => 200,
+                        'data' => $Leccion,
+                        'message' => 'Los datos se guardaron exitosamente'
+                    )
+                );
+            } else {
+                $info = json_encode(
+                    array(
+                        'success' => false,
+                        'code' => 400,
+                        'data' => $Leccion,
+                        'message' => 'Ocurrio un error al guardar la información.'
+                    )
+                );
+            }
+
+            $response->getBody()->write( $info );
+            return $response
+                ->withHeader('Content-Type', 'application/json')
+                ->withHeader('Access-Control-Allow-Origin', '*');
+        });
     });
 };
