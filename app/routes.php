@@ -181,8 +181,6 @@ return function (App $app) {
                     $preguntas[$value['id_pregunta']][] = $value;
                 }
 
-                $letras = ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'i', 'j'];
-
                 for ($i=$inicio; $i < $final + 1; $i++) {
                     $auxRespuestas = array();
                     for ($e=0; $e < count( $preguntas[$i] ); $e++) {
@@ -446,7 +444,10 @@ return function (App $app) {
             $DB = new MySql();
             $sql = "SELECT e.*, l.leccion, l.video FROM encuestas AS e INNER JOIN lecciones AS l ON l.id_encuesta = e.id WHERE e.id = ?;";
             $res = $DB->Buscar_Seguro( $sql, array( $id ) );
-            $sqlUsers = "SELECT * FROM usuarios_encuestas WHERE id_encuesta = ?;";
+            $sqlUsers = "SELECT ue.*,  u.nombre
+            FROM usuarios_encuestas AS ue 
+            INNER JOIN usuarios AS u ON u.id = ue.id_usuario
+            WHERE id_encuesta = ?;";
             $resUsers = $DB->Buscar_Seguro( $sqlUsers, array( $id ) );
             if ( count( $res ) == 0 ) {
                 $info = json_encode(
@@ -491,7 +492,7 @@ return function (App $app) {
                 }
             } else {
                 $Encuesta = $DB->Ejecutar_Seguro( "UPDATE `encuestas` SET `nombre`= ?,`descripcion`= ? WHERE `id`= ?", array( $data['nombre'], $data['descripcion'], $data['id'] ) );
-                $leccion = $DB->Ejecutar_Seguro( "UPDATE `lecciones` SET `leccion`= ?,`video`= ? WHERE `id_encuesta`= ?", array( $data['leccion'], $data['video'], $data['id'] ) );
+                $Leccion = $DB->Ejecutar_Seguro( "UPDATE `lecciones` SET `leccion`= ?,`video`= ? WHERE `id_encuesta`= ?", array( $data['leccion'], $data['video'], $data['id'] ) );
                 $deleteUsuarios = $DB->Ejecutar("DELETE FROM `usuarios_encuestas` WHERE id_encuesta = " . $data['id']);
                 $arrayUsuarios = explode( ',', $data['usuarios'] );
                 foreach ($arrayUsuarios as $usuario) {
@@ -524,5 +525,76 @@ return function (App $app) {
                 ->withHeader('Content-Type', 'application/json')
                 ->withHeader('Access-Control-Allow-Origin', '*');
         });
+
+        $group->post('/updatePreguntas', function (Request $request, Response $response, array $args) {
+
+            $data = $request->getParsedBody();
+            $preguntas = json_decode( $data['preguntas'], true );
+            $encuesta = $data['encuesta'];
+            $DB = new MySql();
+            $count = [];
+
+            foreach ($preguntas as $key => $value) {
+                $idPregunta = intval( $value['idPregunta'] );
+                $pregunta = $value['pregunta'];
+                if ( $idPregunta != 0 ) {
+                    $sql = "UPDATE `preguntas` SET `pregunta`= ? WHERE `id`= ? AND `id_encuesta`= ?";
+                    $params = array( $pregunta, $idPregunta, $encuesta );
+                    $resPregunta = $DB->Ejecutar_Seguro( $sql, $params );
+                    array_push( $count, $resPregunta );
+                    foreach ($value['respuestas'] as $key2 => $value2) {
+                        $idRespuesta = intval( $value2['idRespuesta'] );
+                        $respuesta = $value2['resp'];
+                        if ( $idRespuesta != 0 ) {
+                            $sql = "UPDATE `respuestas` SET `id_encuesta`= ?,`id_pregunta`= ?,`respuesta`= ? WHERE `id`= ?";
+                            $params = array( $encuesta, $idPregunta, $respuesta, $idRespuesta );
+                            $resRespuesta = $DB->Ejecutar_Seguro( $sql, $params );
+                            array_push( $count, $resRespuesta );
+                        } else {
+                            $sql = "INSERT INTO `respuestas`(`id_encuesta`, `id_pregunta`, `respuesta`) VALUES (?, ?, ?);";
+                            $params = array( $encuesta, $idPregunta, $respuesta );
+                            $resRespuesta = $DB->Ejecutar_Seguro( $sql, $params );
+                            array_push( $count, $resRespuesta );
+                        }
+                    }
+                } else {
+                    $sql = "INSERT INTO `preguntas`(`id_encuesta`, `pregunta`) VALUES ( ?, ? )";
+                    $params = array( $encuesta, $pregunta );
+                    $resPregunta = $DB->Ejecutar_Seguro( $sql, $params );
+                    $idPregunta = $DB->Buscar("SELECT MAX(id) AS id FROM preguntas;")[0]['id'];
+                    array_push( $count, $resPregunta );
+                    foreach ($value['respuestas'] as $key2 => $value2) {
+                        $idRespuesta = intval( $value2['idRespuesta'] );
+                        $respuesta = $value2['resp'];
+                        if ( $idRespuesta != 0 ) {
+                            $sql = "UPDATE `respuestas` SET `id_encuesta`= ?,`id_pregunta`= ?,`respuesta`= ? WHERE `id`= ?";
+                            $params = array( $encuesta, $idPregunta, $respuesta, $idRespuesta );
+                            $resRespuesta = $DB->Ejecutar_Seguro( $sql, $params );
+                            array_push( $count, $resRespuesta );
+                        } else {
+                            $sql = "INSERT INTO `respuestas`(`id_encuesta`, `id_pregunta`, `respuesta`) VALUES (?, ?, ?);";
+                            $params = array( $encuesta, $idPregunta, $respuesta );
+                            $resRespuesta = $DB->Ejecutar_Seguro( $sql, $params );
+                            array_push( $count, $resRespuesta );
+                        }
+                    }
+                }
+            }
+
+            $info = json_encode(
+                array(
+                    'success' => true,
+                    'code' => 200,
+                    'data' => $count,
+                    'message' => 'Los datos se guardaron exitosamente'
+                )
+            );
+
+            $response->getBody()->write( $info );
+            return $response
+                ->withHeader('Content-Type', 'application/json')
+                ->withHeader('Access-Control-Allow-Origin', '*');
+        });
+        
     });
 };
