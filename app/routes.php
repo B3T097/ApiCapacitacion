@@ -656,6 +656,41 @@ return function (App $app) {
                 ->withHeader('Content-Type', 'application/json')
                 ->withHeader('Access-Control-Allow-Origin', '*');
         });
+
+        $group->get('/deleteEncuesta/{ id }', function (Request $request, Response $response, array $args) {
+            $id = $args['id'];
+            $DB = new MySql();
+
+            $deleteUsuarios = $DB->Ejecutar_Seguro( "DELETE FROM usuarios_encuestas WHERE id_encuesta = ?", array( $id ) );
+            $deleteRespuestasCorrectas = $DB->Ejecutar_Seguro( "DELETE FROM respuestas_correctas WHERE id_encuesta = ?", array( $id ) );
+            $deleteRespuestas = $DB->Ejecutar_Seguro( "DELETE FROM respuestas WHERE id_encuesta = ?", array( $id ) );
+            $deletePreguntas = $DB->Ejecutar_Seguro( "DELETE FROM preguntas WHERE id_encuesta = ?", array( $id ) );
+            $deleteLecciones = $DB->Ejecutar_Seguro( "DELETE FROM lecciones WHERE id_encuesta = ?", array( $id ) );
+
+            $sql = "DELETE FROM encuestas WHERE id = ?;";
+            $res = $DB->Ejecutar_Seguro( $sql, array( $id ) );
+            if ( $res == 200 || $res == '200' ) {
+                $info = json_encode(
+                    array(
+                        'success' => true,
+                        'code' => 200,
+                        'data' => $res
+                    )
+                );
+            } else {
+                $info = json_encode(
+                    array(
+                        'success' => false,
+                        'code' => 400,
+                        'data' => $res
+                    )
+                );
+            }
+            $response->getBody()->write( $info );
+            return $response
+                ->withHeader('Content-Type', 'application/json')
+                ->withHeader('Access-Control-Allow-Origin', '*');
+        });
         
     });
 };
