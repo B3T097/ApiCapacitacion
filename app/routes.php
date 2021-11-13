@@ -595,6 +595,67 @@ return function (App $app) {
                 ->withHeader('Content-Type', 'application/json')
                 ->withHeader('Access-Control-Allow-Origin', '*');
         });
+
+        $group->get('/respuestas/{ leccion }', function (Request $request, Response $response, array $args) {
+            $leccion = $args['leccion'];
+            $DB = new MySql();
+            $sql = "SELECT * FROM respuestas_correctas WHERE id_encuesta = ?";
+            $res = $DB->Buscar_Seguro( $sql, array( $leccion ) );
+            if ( count( $res ) == 0 ) {
+                $info = json_encode(
+                    array(
+                        'success' => false,
+                        'code' => 400,
+                        'data' => $res
+                    )
+                );
+            } else {
+                $info = json_encode(
+                    array(
+                        'success' => true,
+                        'code' => 200,
+                        'data' => $res
+                    )
+                );
+            }
+            $response->getBody()->write( $info );
+            return $response
+                ->withHeader('Content-Type', 'application/json')
+                ->withHeader('Access-Control-Allow-Origin', '*');
+        });
+
+        $group->post('/updateRespuestas', function (Request $request, Response $response, array $args) {
+
+            $data = $request->getParsedBody();
+            $respuestas = json_decode( $data['respuestas'], true );
+            $encuesta = $data['encuesta'];
+            $DB = new MySql();
+            $count = [];
+
+            $delete = $DB->Ejecutar_Seguro( "DELETE FROM respuestas_correctas WHERE id_encuesta = ?", array( $encuesta ) );
+            foreach ($respuestas as $key => $value) {
+                $idPregunta = intval( explode( '-', $value['idPregunta'] )[1] );
+                $respuesta = explode( '-', $value['idRespuesta'] )[1];
+                $sql = "INSERT INTO `respuestas_correctas`(`id_encuesta`, `id_pregunta`, `id_respuesta`) VALUES (?, ?, ?)";
+                $insert = $DB->Ejecutar_Seguro( $sql, array( $encuesta, $idPregunta, $respuesta ) );
+            }
+
+            $info = json_encode(
+                array(
+                    'success' => true,
+                    'code' => 200,
+                    'data' => $count,
+                    'respuestas' => $respuestas,
+                    'idEncuesta' => $encuesta,
+                    'message' => 'Los datos se guardaron exitosamente'
+                )
+            );
+
+            $response->getBody()->write( $info );
+            return $response
+                ->withHeader('Content-Type', 'application/json')
+                ->withHeader('Access-Control-Allow-Origin', '*');
+        });
         
     });
 };
